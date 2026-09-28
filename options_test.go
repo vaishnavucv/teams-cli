@@ -189,3 +189,92 @@ func TestUsageTextIncludesDiagnosticsAndRefreshFlags(t *testing.T) {
 		}
 	}
 }
+
+func TestParseAppOptionsExportDefaults(t *testing.T) {
+	options, err := parseAppOptions([]string{"export"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !options.ExportMode {
+		t.Fatal("expected export mode to be enabled")
+	}
+	if options.ExportMessages || options.ExportUnreadOnly {
+		t.Fatal("expected message and unread filters to be off by default")
+	}
+	if options.ExportLimit != 0 {
+		t.Fatalf("expected no conversation limit by default, got %d", options.ExportLimit)
+	}
+	if options.ExportTimeout != defaultExportTimeout {
+		t.Fatalf("expected default export timeout %s, got %s", defaultExportTimeout, options.ExportTimeout)
+	}
+	if options.DoctorMode {
+		t.Fatal("expected export not to enable doctor mode")
+	}
+}
+
+func TestParseAppOptionsExportFlags(t *testing.T) {
+	options, err := parseAppOptions([]string{
+		"export",
+		"--with-messages",
+		"--unread",
+		"--limit", "15",
+		"--timeout", "45s",
+	})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !options.ExportMode || !options.ExportMessages || !options.ExportUnreadOnly {
+		t.Fatalf("expected export flags to be set, got %+v", options)
+	}
+	if options.ExportLimit != 15 {
+		t.Fatalf("expected export limit 15, got %d", options.ExportLimit)
+	}
+	if options.ExportTimeout != 45*time.Second {
+		t.Fatalf("expected export timeout 45s, got %s", options.ExportTimeout)
+	}
+}
+
+func TestParseAppOptionsExportSupportsEqualsForms(t *testing.T) {
+	options, err := parseAppOptions([]string{"--export", "--limit=5", "--timeout=90"})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if !options.ExportMode {
+		t.Fatal("expected export mode to be enabled")
+	}
+	if options.ExportLimit != 5 {
+		t.Fatalf("expected export limit 5, got %d", options.ExportLimit)
+	}
+	if options.ExportTimeout != 90*time.Second {
+		t.Fatalf("expected export timeout 90s, got %s", options.ExportTimeout)
+	}
+}
+
+func TestParseAppOptionsRejectsInvalidExportValues(t *testing.T) {
+	testCases := [][]string{
+		{"export", "--limit", "0"},
+		{"export", "--limit", "abc"},
+		{"export", "--timeout", "0"},
+		{"export", "--limit"},
+		{"export", "--timeout"},
+	}
+
+	for _, args := range testCases {
+		if _, err := parseAppOptions(args); err == nil {
+			t.Fatalf("expected an error for %v", args)
+		}
+	}
+}
+
+func TestUsageTextIncludesExportFlags(t *testing.T) {
+	text := usageText("teams-cli")
+
+	for _, needle := range []string{"export", "--with-messages", "--unread", "--limit", "--timeout"} {
+		if !strings.Contains(text, needle) {
+			t.Fatalf("expected usage text to mention %s", needle)
+		}
+	}
+}

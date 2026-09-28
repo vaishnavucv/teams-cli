@@ -10,6 +10,10 @@ import (
 
 const defaultMessageLimit = 200
 
+// An export runs unattended — from cron, from an agent — where a hung request
+// is worse than a partial answer, so it is bounded unless asked otherwise.
+const defaultExportTimeout = 2 * time.Minute
+
 type AppOptions struct {
 	MessageLimit                int
 	LogLevel                    logrus.Level
@@ -20,11 +24,17 @@ type AppOptions struct {
 	ShowHelp                    bool
 	ShowVersion                 bool
 	DoctorMode                  bool
+	ExportMode                  bool
+	ExportMessages              bool
+	ExportUnreadOnly            bool
+	ExportLimit                 int
+	ExportTimeout               time.Duration
 }
 
 func defaultAppOptions() AppOptions {
 	return AppOptions{
 		MessageLimit:                defaultMessageLimit,
+		ExportTimeout:               defaultExportTimeout,
 		LogLevel:                    logrus.InfoLevel,
 		LiveRefresh:                 true,
 		RefreshMessagesInterval:     defaultLiveMessageRefreshInterval,
@@ -41,6 +51,34 @@ func parseAppOptions(args []string) (AppOptions, error) {
 		switch {
 		case arg == "doctor" || arg == "--doctor":
 			options.DoctorMode = true
+		case arg == "export" || arg == "--export":
+			options.ExportMode = true
+		case arg == "--with-messages":
+			options.ExportMessages = true
+		case arg == "--unread":
+			options.ExportUnreadOnly = true
+		case arg == "--limit" || strings.HasPrefix(arg, "--limit="):
+			raw, nextIdx, err := optionValue(args, idx, "--limit")
+			if err != nil {
+				return options, err
+			}
+			limit, err := parseMessageLimit(raw)
+			if err != nil {
+				return options, err
+			}
+			options.ExportLimit = limit
+			idx = nextIdx
+		case arg == "--timeout" || strings.HasPrefix(arg, "--timeout="):
+			raw, nextIdx, err := optionValue(args, idx, "--timeout")
+			if err != nil {
+				return options, err
+			}
+			d, err := parseRefreshInterval(raw, "--timeout")
+			if err != nil {
+				return options, err
+			}
+			options.ExportTimeout = d
+			idx = nextIdx
 		case arg == "--help" || arg == "-h":
 			options.ShowHelp = true
 		case arg == "--version":
@@ -184,6 +222,7 @@ func usageText(program string) string {
 	return fmt.Sprintf(`Usage:
   %s [options]
   %s doctor [options]
+  %s export [options]
 
 Options:
   -h, --help                  Show this help text
@@ -197,9 +236,16 @@ Options:
       --no-live               Disable background refresh polling
       --doctor                Run diagnostics instead of launching the TUI
 
+Export options (with 'export', which prints JSON to stdout and never draws a TUI):
+      --with-messages         Include recent messages in each conversation
+      --unread                Only conversations that are unread
+      --limit <count>         Keep only the N most recent conversations
+      --timeout <d>           Give up after this long (default %s)
+
 Examples:
   %s --msg 20
   %s --token-dir ~/.config/fossteams --debug
   %s doctor --token-dir ~/.config/fossteams
-`, program, program, defaultLiveMessageRefreshInterval, defaultLiveConversationRefreshInterval, program, program, program)
+  %s export --unread --with-messages
+`, program, program, program, defaultLiveMessageRefreshInterval, defaultLiveConversationRefreshInterval, defaultExportTimeout, program, program, program, program)
 }

@@ -7,6 +7,16 @@ this repository.
 
 ## [Unreleased]
 
+### Added
+
+- `export` subcommand that writes conversations to stdout as JSON and never
+  draws a TUI, so scripts, cron jobs and other tooling can consume Teams data
+  without a terminal
+- `--with-messages`, `--unread` and `--limit` flags to shape an export, and
+  `--timeout` (default `2m`) to bound an unattended run
+- Per-conversation `error` field in the export payload so a single unreachable
+  conversation does not discard the rest of the output
+
 ## [v0.2.3] - 2026-04-02
 
 ### Added

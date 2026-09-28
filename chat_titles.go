@@ -10,8 +10,10 @@ import (
 	"golang.org/x/net/html"
 )
 
-func textMessage(input string) string {
-	output := ""
+// messageTextNodes returns the non-empty text nodes of an HTML message body in
+// document order, exactly as they appear. Callers decide how to present them.
+func messageTextNodes(input string) []string {
+	var nodes []string
 	z := html.NewTokenizer(bytes.NewBuffer([]byte(input)))
 	for {
 		tt := z.Next()
@@ -19,20 +21,40 @@ func textMessage(input string) string {
 			break
 		}
 
-		switch tt {
-		case html.TextToken:
+		if tt == html.TextToken {
 			text := string(z.Text())
 			if strings.TrimSpace(text) == "" {
 				continue
 			}
-			output += fmt.Sprintf("\t%v\n", text)
-		}
-		if tt == html.ErrorToken {
-			break
+			nodes = append(nodes, text)
 		}
 	}
 
+	return nodes
+}
+
+// textMessage formats a message body for the messages pane: one indented line
+// per text node.
+func textMessage(input string) string {
+	output := ""
+	for _, text := range messageTextNodes(input) {
+		output += fmt.Sprintf("\t%v\n", text)
+	}
+
 	return output
+}
+
+// plainTextMessage is the same content without the pane's indentation, for
+// consumers that are not a terminal — a JSON export, a log line, a summary.
+// Tabs and trailing newlines are display decisions, and they have no business
+// in a machine-readable field.
+func plainTextMessage(input string) string {
+	nodes := messageTextNodes(input)
+	for idx, text := range nodes {
+		nodes[idx] = strings.TrimSpace(text)
+	}
+
+	return strings.TrimSpace(strings.Join(nodes, "\n"))
 }
 
 func (s *AppState) chatTitle(chat csa.Chat) string {
