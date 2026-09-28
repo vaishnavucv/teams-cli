@@ -28,6 +28,20 @@ func main() {
 		printVersion(os.Stdout)
 		return
 	}
+	// Before the logger and before tview: an export writes JSON to stdout and
+	// must not have log lines or escape codes mixed into it.
+	if options.ExportMode {
+		if err := applyTokenDirToEnv(options.TokenDir); err != nil {
+			fmt.Fprintf(os.Stderr, "token setup failed: %v\n", err)
+			os.Exit(1)
+		}
+		if err := runExport(os.Stdout, options); err != nil {
+			fmt.Fprintf(os.Stderr, "export: %v\n", err)
+			os.Exit(1)
+		}
+		return
+	}
+
 	if options.DoctorMode {
 		if err := runDoctor(os.Stdout, options); err != nil {
 			fmt.Fprintf(os.Stderr, "doctor: %v\n", err)

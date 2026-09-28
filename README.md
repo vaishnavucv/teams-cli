@@ -47,6 +47,7 @@ go run ./ msg=20
 - Background refresh for both message lists and conversation trees.
 - Navigate the UI entirely with keyboard shortcuts.
 - Clean shutdown on `q` or `Ctrl+C`.
+- Export conversations as JSON for scripts and scheduled jobs, without a TUI.
 
 ### Keyboard Navigation
 - **Arrow Keys**: Move up/down lists, expand (`Right`) or collapse (`Left`) trees.
@@ -61,6 +62,37 @@ If you have issues logging in or starting the app, run the built-in doctor to te
 ```bash
 go run ./ doctor
 ```
+
+### JSON Export
+The TUI needs a terminal and a person at the keyboard. `export` needs neither: it
+writes JSON to stdout and exits, so cron jobs, scripts and other tooling can read
+your conversations without driving a full-screen UI.
+
+```bash
+go run ./ export
+```
+
+Include the recent messages of each conversation, not just the preview line:
+```bash
+go run ./ export --with-messages
+```
+
+Narrow the output — useful for a notification job that only cares about what you
+have not read yet:
+```bash
+go run ./ export --unread --with-messages --limit 10
+```
+
+Diagnostics and errors go to stderr, so stdout stays valid JSON and can be piped
+directly:
+```bash
+go run ./ export --unread | jq -r '.conversations[].title'
+```
+
+Exports are bounded by `--timeout` (default `2m`) because an unattended run
+should fail rather than hang. A conversation whose messages cannot be fetched
+still appears in the output with an `error` field, so one unreachable chat does
+not discard the rest.
 
 ## Support
 
